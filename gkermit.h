@@ -35,9 +35,14 @@
 
 #include <stdio.h>
 #include <errno.h>                      /* Added in G-Kermit 2.0 */
+#ifndef __APPLE__
 #include <malloc.h>                     /* Added in G-Kermit 2.0 */
+#endif /* __APPLE__ */
 #include <string.h>                     /* Added in G-Kermit 2.0 */
 #include <stdlib.h>                     /* Added in G-Kermit 2.0 */
+#ifdef __APPLE__
+#include <unistd.h>
+#endif /* __APPLE__ */
 
 /* Kermit protocol definitions */
 
