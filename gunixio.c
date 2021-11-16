@@ -17,6 +17,8 @@
       Bronx NY
       http://kermitproject.org
       kermit@kermitproject.org
+    Last update: Mon Nov 15 09:48:53 2021
+      Suppress warning about write(1,"\015\012",2); in ttres().
 
   Copyright (C) 1999, 2021
   The Trustees of Columbia University in the City of New York.
@@ -496,7 +498,8 @@ ttpkt(parity) int parity; {		/* Put comm device in packet mode */
 
 int
 ttres() {				/* Reset terminal */
-    int x = 0;
+    int dummy = 0;                      /* Suppress warning about write() */
+    int x = 0;                          /* API return codes */
     if (havemodes) {			/* Restore old modes */
 #ifdef POSIX
 	x = tcsetattr(0,TCSADRAIN,&ttold);
@@ -514,7 +517,7 @@ ttres() {				/* Reset terminal */
 #endif /* SYSV */
 #endif /* POSIX */
     }
-    write(1,"\015\012",2);
+    dummy = (int) write(1,"\015\012",2);
     raw = 0;
     return(x);
 }

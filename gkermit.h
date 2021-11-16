@@ -14,6 +14,8 @@
       Bronx NY
       http://kermitproject.org
       kermit@kermitproject.org
+    Most recent update:
+      Mon Nov 15 08:24:28 2021
 
   Copyright (C) 1999, 2021
   The Trustees of Columbia University in the City of New York.
@@ -33,16 +35,30 @@
 #ifndef _GKERMIT_H
 #define _GKERMIT_H
 
+/* __APPLE__ items from Kenji Rikitake 31 May 2021 */
+
 #include <stdio.h>
 #include <errno.h>                      /* Added in G-Kermit 2.0 */
-#ifndef __APPLE__
+#ifndef __APPLE__                       /* macOS with Xcode has not malloc.h */
 #include <malloc.h>                     /* Added in G-Kermit 2.0 */
 #endif /* __APPLE__ */
 #include <string.h>                     /* Added in G-Kermit 2.0 */
 #include <stdlib.h>                     /* Added in G-Kermit 2.0 */
-#ifdef __APPLE__
-#include <unistd.h>
-#endif /* __APPLE__ */
+
+/* unistd.h might be needed for sleep() prototype */
+
+#ifndef NEEDUNISTD
+ #ifdef __APPLE__
+  #define NEEDUNISTD
+ #else
+  #ifdef __NetBSD__
+   #define NEEDUNISTD
+ #endif /* __NetBSD__ */
+ #endif /* __APPLE__ */
+#endif /* NEEDUNISTD */
+#ifdef NEEDUNISTD
+ #include <unistd.h>
+#endif /* NEEDUNISTD */
 
 /* Kermit protocol definitions */
 

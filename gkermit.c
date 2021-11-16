@@ -1,14 +1,15 @@
 /* G K E R M I T  --  GNU Kermit  */
 
 /*
+  Sat Dec 25 19:22:54 1999:
   A free implementation of the Kermit file transfer protocol for UNIX.
   If you change this software, please either (a) send changes back to the
   Kermit Project to be considered for the base version; or (b) change the
   strings below to show a new version number and date and to reflect the
   person or organization responsible for the new version.
 
-  Sat Dec 25 19:22:54 1999
-
+  .................................
+  Wed May 26 08:47:48 2021:
   In the years following the initial rlease of this program, which was
   designed to be eternal, the C libraries and header files changed and
   changed and changed to the extent that in 2021 G-Kermit 1.0 ccan't be
@@ -20,11 +21,24 @@
   1. The version identification just below, and:
   2. The inclusion of four previously unneeded header files in gkermit.h.
 
-  Wed May 26 08:47:48 2021
+  .................................
+  Mon Nov 15 08:31:48 2021:
+  From Kenji Rikitake, two patches added to gkermit.h for macOS with Xcode:
+
+  1. macOS with Xcode has no <malloc.h>
+  2. macOS with Xcode has the prototype of sleep() in <unistd.h>
+  Conditional if(n)def with __APPLE__ flag, dedicated for macOS.
+
+  It seems unistd.h is now required on many platforms; I now #include it
+  in all builds by default; to suppress the #include on platforms that
+  don't have unistd.h, do: make "KFLAGS=-DNOUNISTD" ...
 */
 
-/* char *versio = "G-Kermit CU-1.00, Columbia University, 1999-12-25"; */
+/*
+char *versio = "G-Kermit CU-1.00, Columbia University, 1999-12-25";
 char *versio = "G-Kermit 2.00, The Kermit Project, 2021-05-26";
+*/
+char *versio = "G-Kermit 2.01, The Kermit Project, 2021-11-15";
 char *url =    "http://www.kermitproject.org/gkermit.html";
 char *email =  "kermit@kermitproject.edu";
 /*

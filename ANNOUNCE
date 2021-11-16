@@ -1,6 +1,7 @@
-The Original G-Kermit 1.00 announcement follows.  Version 2.0 of 26 May 2021
-is functionally identical but has been adjusted compile and link successfully
-on modern Unix platforms such as Ubuntu 20.04, Red Hat EL6, and NetBSD 9.0.
+The Original G-Kermit 1.00 announcement follows.  Version 2.00 of 26 May 2021
+and 2.01 0f 15 November 2021 are functionally identical but have been adjusted
+to compile and link successfully on modern Unix platforms such as Ubuntu 20.04,
+Red Hat EL6, NetBSD 9.2, and macOS 10.15.7 with Xcode 12.4.
 
 ---------------------------------
 
