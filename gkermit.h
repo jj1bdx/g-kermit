@@ -53,8 +53,11 @@
  #else
   #ifdef __NetBSD__
    #define NEEDUNISTD
- #endif /* __NetBSD__ */
+  #endif /* __NetBSD__ */
  #endif /* __APPLE__ */
+ #ifdef __linux__
+  #define NEEDUNISTD
+ #endif /* __linux__ */
 #endif /* NEEDUNISTD */
 #ifdef NEEDUNISTD
  #include <unistd.h>
