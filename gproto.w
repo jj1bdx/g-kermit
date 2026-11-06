@@ -33,7 +33,9 @@
 _MYPROTOTYPE( int closof, (void) );	/* Close output file */
 _MYPROTOTYPE( VOID errpkt, (char *) );	/* Send Error packet */
 
+extern VOID progress_start(), progress_update(), progress_finish();
 extern char * xdata, *rdatap, **cmlist, *cmarg, *rpar(), strbuf[], filnam[];
+extern long filelength;
 extern int start, bctu, bctr, delay, cx, cz, failure, attributes, datalen;
 extern int streamok, streaming, timint;
 extern FILE * db;
@@ -129,6 +131,7 @@ s {					/* Start state for Send. */
       errpkt("sdata");
 }
 <sseof>Y {				/* Receive ACK to EOF */
+    progress_finish();
     if (gnfile() > 0) {			/* Get next file from list */
 	if (sfile() > 0)
 	  BEGIN ssfil;
@@ -158,6 +161,7 @@ v { tinit(); rinit(); BEGIN srini; }	/* Start-state for Receive */
     if (rcvfil() < 0) {
 	errpkt("rcvfil");
     } else {
+	progress_start(filnam, -1L);
 	encstr(filnam);
 	ack1(xdata);
 	streamon();
@@ -185,6 +189,7 @@ v { tinit(); rinit(); BEGIN srini; }	/* Start-state for Receive */
     if (closof() < 0) {			/* Close the output file */
 	errpkt("closof");
     } else {
+	progress_finish();
 	ack();				/* Send ACK */
 	BEGIN srfil;			/* Wait for another file or EOT */
     }
@@ -201,6 +206,7 @@ v { tinit(); rinit(); BEGIN srini; }	/* Start-state for Receive */
     if (closof() < 0) {			/* Close the output file */
 	errpkt("closof");
     } else {
+	progress_finish();
 	ack();				/* Send ACK */
 	BEGIN srfil;			/* Wait for another file or EOT */
     }

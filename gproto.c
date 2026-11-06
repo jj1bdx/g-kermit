@@ -38,7 +38,9 @@
 _MYPROTOTYPE( int closof, (void) );	/* Close output file */
 _MYPROTOTYPE( VOID errpkt, (char *) );	/* Send Error packet */
 
+extern VOID progress_start(), progress_update(), progress_finish();
 extern char * xdata, *rdatap, **cmlist, *cmarg, *rpar(), strbuf[], filnam[];
+extern long filelength;
 extern int start, bctu, bctr, delay, cx, cz, failure, attributes, datalen;
 extern int streamok, streaming, timint;
 extern FILE * db;
@@ -166,6 +168,7 @@ case 5:
     break;
 case 6:
     {				/* Receive ACK to EOF */
+    progress_finish();
     if (gnfile() > 0) {			/* Get next file from list */
 	if (sfile() > 0)
 	  BEGIN ssfil;
@@ -199,6 +202,7 @@ case 11:
     if (rcvfil() < 0) {
 	errpkt("rcvfil");
     } else {
+	progress_start(filnam, -1L);
 	encstr(filnam);
 	ack1(xdata);
 	streamon();
@@ -232,6 +236,7 @@ case 14:
     if (closof() < 0) {			/* Close the output file */
 	errpkt("closof");
     } else {
+	progress_finish();
 	ack();				/* Send ACK */
 	BEGIN srfil;			/* Wait for another file or EOT */
     }
@@ -252,6 +257,7 @@ case 16:
     if (closof() < 0) {			/* Close the output file */
 	errpkt("closof");
     } else {
+	progress_finish();
 	ack();				/* Send ACK */
 	BEGIN srfil;			/* Wait for another file or EOT */
     }
