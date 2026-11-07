@@ -33,7 +33,10 @@
 _MYPROTOTYPE( int closof, (void) );	/* Close output file */
 _MYPROTOTYPE( VOID errpkt, (char *) );	/* Send Error packet */
 
+extern VOID progress_start(), progress_update(), progress_finish();
+extern VOID progress_fail();
 extern char * xdata, *rdatap, **cmlist, *cmarg, *rpar(), strbuf[], filnam[];
+extern long filelength;
 extern int start, bctu, bctr, delay, cx, cz, failure, attributes, datalen;
 extern int streamok, streaming, timint;
 extern FILE * db;
@@ -100,6 +103,7 @@ s {					/* Start state for Send. */
 }
 <ssatt>Y {				/* Receive ACK to Attribute packet */
     if (*rdatap == 'N') {		/* Check for refusal */
+        cx = 1;
 	seof("D");
 	BEGIN sseof;
     } else if ((x = sdata()) == 0) {	/* Otherwise send first Data packet */
@@ -129,6 +133,10 @@ s {					/* Start state for Send. */
       errpkt("sdata");
 }
 <sseof>Y {				/* Receive ACK to EOF */
+    if (cx || cz)
+        progress_fail(cz ? "Batch cancelled" : "File cancelled");
+    else
+        progress_finish();
     if (gnfile() > 0) {			/* Get next file from list */
 	if (sfile() > 0)
 	  BEGIN ssfil;
@@ -158,6 +166,7 @@ v { tinit(); rinit(); BEGIN srini; }	/* Start-state for Receive */
     if (rcvfil() < 0) {
 	errpkt("rcvfil");
     } else {
+	progress_start(filnam, -1L);
 	encstr(filnam);
 	ack1(xdata);
 	streamon();
@@ -181,10 +190,14 @@ v { tinit(); rinit(); BEGIN srini; }	/* Start-state for Receive */
 }
 <sratt>Z {				/* Empty file */
     if (*rdatap == 'D')			/* Check for Discard directive */
-      cx = 1;
-    if (closof() < 0) {			/* Close the output file */
-	errpkt("closof");
+		cx = 1;
+	if (closof() < 0) {			/* Close the output file */
+		errpkt("closof");
     } else {
+		if (cx)
+			progress_fail("File discarded by sender");
+		else
+			progress_finish();
 	ack();				/* Send ACK */
 	BEGIN srfil;			/* Wait for another file or EOT */
     }
@@ -201,6 +214,7 @@ v { tinit(); rinit(); BEGIN srini; }	/* Start-state for Receive */
     if (closof() < 0) {			/* Close the output file */
 	errpkt("closof");
     } else {
+	progress_finish();
 	ack();				/* Send ACK */
 	BEGIN srfil;			/* Wait for another file or EOT */
     }
@@ -222,7 +236,9 @@ r {					/* Start state for Get */
       BEGIN srini;			/* Wait for S packet */
 }
 
-E { return(failure = 1); }		/* Receive an Error packet */
-
+E {
+	progress_fail((char *)rdatap);
+	return (failure = 1);
+}							/* Receive an Error packet */
 . { errpkt("Unknown packet type"); }	/* Handle unwanted packet types. */
 %%

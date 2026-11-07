@@ -262,6 +262,11 @@ _MYPROTOTYPE( char *rpar, (void) );	/* Tell parameters to other Kermit */
 _MYPROTOTYPE( VOID usage, (void) );	/* Give usage message */
 _MYPROTOTYPE( int gwart, (void) );	/* State table switcher */
 
+_MYPROTOTYPE( VOID progress_start, (char *, long) );
+_MYPROTOTYPE( VOID progress_update, (long) );
+_MYPROTOTYPE( VOID progress_finish, (void) );
+_MYPROTOTYPE( VOID progress_fail, (char *) );
+
 /* Externs */
 
 #ifdef ERRNO_H

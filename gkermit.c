@@ -87,6 +87,7 @@ char *build =  "stty";
 
 #define _GKERMIT_C
 #include <stdio.h>
+#include <time.h>
 #include "gkermit.h"
 
 /* Forward declarations of functions used within this module... */
@@ -193,6 +194,16 @@ char start  = 0;			/* Starting state for automaton */
 char **xargv;				/* Global copies of argv */
 int  xargc;				/* and argc */
 char *dftty = CTTNAM;			/* Default controlling terminal name */
+
+static long progress_bytes = 0L;
+static long progress_total = -1L;
+static long progress_last = 0L;
+static long progress_check_bytes = 0L;
+static long progress_rate_bytes = 0L;
+static long progress_bps = 0L;
+static time_t progress_rate_time = 0;
+static time_t progress_display_time = 0;
+static char progress_name[MAXPATHLEN + 1];
 
 char *
 #ifdef __STDC__
@@ -341,6 +352,7 @@ tinit() {				/* Transaction Initialization */
 
 VOID
 errpkt(s) char *s; {			/* Fatal error */
+    progress_fail(s);
     if (start == 'v' || start == 'r')	/* Receiving a file? */
       sleep(1);				/* Time to soak up incoming junk. */
     spacket('E',seq,(int)strlen(s),s); 	/* Send Error packet. */
@@ -384,6 +396,10 @@ sfile() {				/* Send file header packet */
     cmarg2 = NULL;			/* Only works for one file */
     if (debug)
       fprintf(db,"sfile pktnam %s\n",pktnam);
+
+    extern long filelength;
+    progress_start(pktnam, filelength);
+
     x = encstr(pktnam);			/* Encode name */
     if (debug)
       fprintf(db,"sfile encstr[%s] x=%d\n",xdata,x);
@@ -459,7 +475,26 @@ gattr(s) char *s; {			/* Get attributes from other Kermit */
 		text = 0;
 	    }
 	    break;
+	  case '1': { /* File length in bytes */
+	    char sizebuf[32];
+	    char *endp;
+	    long total;
 
+	    if (aln > 0 && aln < sizeof(sizebuf)) {
+		memcpy(sizebuf, s, aln);
+		sizebuf[aln] = NUL;
+		errno = 0;
+		total = strtol(sizebuf, &endp, 10);
+		if (errno == 0 &&
+		    endp != sizebuf &&
+		    *endp == NUL &&
+		    total >= 0L) {
+		    progress_total = total;
+		}
+	    }
+	    s += aln;
+	    break;
+	  }
 	  default:			/* Unknown attribute */
 	    s += aln;			/* Just skip past it */
 	    break;
@@ -609,7 +644,10 @@ rpacket() {				/* Read a packet */
     j = ttinl(p,maxrp,timint,reol,rmark,0); /* Read a raw packet */
     if (j < 5) {			/* Error */
 	if (j == -1) return('T');	/* Timed out. */
-	if (j < -1) doexit(1);		/* I/O error, hangup, etc. */
+	if (j < -1) {
+	    progress_fail("Communication I/O error");
+	    doexit(1);			/* I/O error, hangup, etc. */
+	}
 	if (debug) fprintf(db,"rpacket runt");
 	return('Q');			/* Runt */
     }
@@ -732,6 +770,7 @@ getpkt(maxlen) int maxlen; {		/* Fill a packet from file */
 	    if (!c) c = -1;
 	} else {			/* or file... */
 	    c = zgetc(text);
+	    if (c >= 0) progress_update(1L);
 	}
 	if (c < 0) {			/* Watch out for empty file. */
 	    first = -1;
@@ -752,6 +791,7 @@ getpkt(maxlen) int maxlen; {		/* Fill a packet from file */
 	    if (!next) next = -1;
 	} else {
 	    next = zgetc(text);
+	    if (next >= 0) progress_update(1L);
 	}
 	if (next < 0) first = -1;	/* If none, we're at EOF. */
         osize = size;			/* Remember current size. */
@@ -891,7 +931,8 @@ decode(len) int len; {			/* Decode packet data field */
 		*osp++ = a;		/* the repeat count. */
 	    } else {
 		putc((char)a,ofp);	/* Use putc macro here to avoid */
-		if (ferror(ofp)) {	/* function-call overhead. */
+		if (!ferror(ofp)) progress_update(1L);
+		else {	/* function-call overhead. */
 		    if (debug)
 		      fprintf(db,"decode putc a=%u errno=%u\n",a,errno);
 		    failure = 1;
@@ -1117,4 +1158,120 @@ scmd(t,s) char t, *s;
 {
     encstr(s);				/* Encode the command string */
     return(spacket(t,seq,size,xdata));	/* Send the packet */
+}
+
+/*
+ * Per-file transfer progress. Keep output on stderr so it cannot be
+ * confused with protocol data or other output captured from stdout.
+ */
+VOID
+progress_start(name, total)
+char *name;
+long total;
+{
+    strncpy(progress_name, name ? name : "", MAXPATHLEN);
+    progress_name[MAXPATHLEN] = NUL;
+    progress_bytes = 0L;
+    progress_last = 0L;
+    progress_check_bytes = 0L;
+    progress_rate_bytes = 0L;
+    progress_bps = 0L;
+    progress_total = total;
+    progress_rate_time = time(NULL);
+    progress_display_time = progress_rate_time;
+    fprintf(stderr, "%s: 0 bytes", progress_name);
+    fflush(stderr);
+}
+
+VOID
+progress_update(amount)
+long amount;
+{
+    time_t now;
+    long elapsed;
+    long percent;
+
+    if (amount > 0L)
+        progress_bytes += amount;
+
+    /*
+     * Check the clock every 4 KiB to avoid calling time() for
+     * every byte. Update the display every second or every 16 KiB.
+     */
+    if (progress_bytes - progress_check_bytes < 4096L)
+        return;
+
+    progress_check_bytes = progress_bytes;
+    now = time(NULL);
+    elapsed = (long)(now - progress_rate_time);
+
+    if (elapsed > 0L) {
+        progress_bps =
+            (progress_bytes - progress_rate_bytes) / elapsed;
+        progress_rate_bytes = progress_bytes;
+        progress_rate_time = now;
+    }
+
+    if (progress_bytes - progress_last < 16384L &&
+        now == progress_display_time &&
+        (progress_total < 0L || progress_bytes < progress_total))
+        return;
+
+    progress_last = progress_bytes;
+    progress_display_time = now;
+
+    if (progress_total < 0L)
+        fprintf(stderr, "\r%s: %ld/- bytes", progress_name,
+                progress_bytes);
+    else
+        fprintf(stderr, "\r%s: %ld/%ld bytes", progress_name,
+                progress_bytes, progress_total);
+
+    fprintf(stderr, " %ld B/s", progress_bps);
+    fflush(stderr);
+}
+
+VOID
+progress_finish()
+{
+    if (progress_total < 0)
+        fprintf(stderr, "\r%s: %ld/- bytes", progress_name, progress_bytes);
+    else
+        fprintf(stderr, "\r%s: %ld/%ld bytes", progress_name, progress_bytes, progress_total);
+    fprintf(stderr, " %ld B/s", progress_bps);
+    fprintf(stderr, "\r\nComplete\r\n");
+    fflush(stderr);
+    progress_name[0] = NUL;
+    progress_bytes = progress_last = 0L;
+    progress_check_bytes = progress_rate_bytes = 0L;
+    progress_bps = 0L;
+    progress_total = -1L;
+}
+
+/*
+ * Report a failed file transfer.
+ */
+VOID
+progress_fail(reason)
+char *reason;
+{
+    if (!progress_name[0])
+        return;
+
+    if (progress_total < 0L)
+        fprintf(stderr, "\r%s: %ld/- bytes", progress_name, progress_bytes);
+    else
+        fprintf(stderr, "\r%s: %ld/%ld bytes",
+                progress_name, progress_bytes, progress_total);
+
+    fprintf(stderr, " %ld B/s", progress_bps);
+    fprintf(stderr, "\r\nFailed: %s\r\n",
+            (reason && *reason) ? reason : "Unknown error");
+    fflush(stderr);
+
+    progress_name[0] = NUL;
+    progress_bytes = progress_last = 0L;
+    progress_check_bytes = progress_rate_bytes = 0L;
+    progress_bps = 0L;
+    progress_total = -1L;
 }
