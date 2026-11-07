@@ -38,7 +38,10 @@ MANEXT = l
 # Default compiler and flags
 
 CC=cc
-CFLAGS= -DPOSIX -O $(KFLAGS)
+# For Ubuntu 26.04, the default C language standard is -std=gnu23,
+# while will reject incomplete prototypes;
+# set the language standard to C11 to avoid the compilation error
+CFLAGS= -std=c11 -DPOSIX -O $(KFLAGS)
 
 # Object files
 
