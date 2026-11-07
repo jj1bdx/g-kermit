@@ -39,6 +39,7 @@ _MYPROTOTYPE( int closof, (void) );	/* Close output file */
 _MYPROTOTYPE( VOID errpkt, (char *) );	/* Send Error packet */
 
 extern VOID progress_start(), progress_update(), progress_finish();
+extern VOID progress_fail();
 extern char * xdata, *rdatap, **cmlist, *cmarg, *rpar(), strbuf[], filnam[];
 extern long filelength;
 extern int start, bctu, bctr, delay, cx, cz, failure, attributes, datalen;
@@ -135,6 +136,7 @@ case 3:
 case 4:
     {				/* Receive ACK to Attribute packet */
     if (*rdatap == 'N') {		/* Check for refusal */
+        cx = 1;
 	seof("D");
 	BEGIN sseof;
     } else if ((x = sdata()) == 0) {	/* Otherwise send first Data packet */
@@ -168,7 +170,10 @@ case 5:
     break;
 case 6:
     {				/* Receive ACK to EOF */
-    progress_finish();
+    if (cx || cz)
+        progress_fail(cz ? "Batch cancelled" : "File cancelled");
+    else
+        progress_finish();
     if (gnfile() > 0) {			/* Get next file from list */
 	if (sfile() > 0)
 	  BEGIN ssfil;
@@ -232,11 +237,14 @@ case 13:
 case 14:
     {				/* Empty file */
     if (*rdatap == 'D')			/* Check for Discard directive */
-      cx = 1;
-    if (closof() < 0) {			/* Close the output file */
-	errpkt("closof");
+		cx = 1;
+	if (closof() < 0) {			/* Close the output file */
+		errpkt("closof");
     } else {
-	progress_finish();
+		if (cx)
+			progress_fail("File discarded by sender");
+		else
+			progress_finish();
 	ack();				/* Send ACK */
 	BEGIN srfil;			/* Wait for another file or EOT */
     }
@@ -281,7 +289,10 @@ case 18:
 }
     break;
 case 19:
-    { return(failure = 1); }
+    {
+	progress_fail((char *)rdatap);
+	return (failure = 1);
+}
     break;
 case 20:
     { errpkt("Unknown packet type"); }

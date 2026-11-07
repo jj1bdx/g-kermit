@@ -352,6 +352,7 @@ tinit() {				/* Transaction Initialization */
 
 VOID
 errpkt(s) char *s; {			/* Fatal error */
+    progress_fail(s);
     if (start == 'v' || start == 'r')	/* Receiving a file? */
       sleep(1);				/* Time to soak up incoming junk. */
     spacket('E',seq,(int)strlen(s),s); 	/* Send Error packet. */
@@ -643,7 +644,10 @@ rpacket() {				/* Read a packet */
     j = ttinl(p,maxrp,timint,reol,rmark,0); /* Read a raw packet */
     if (j < 5) {			/* Error */
 	if (j == -1) return('T');	/* Timed out. */
-	if (j < -1) doexit(1);		/* I/O error, hangup, etc. */
+	if (j < -1) {
+	    progress_fail("Communication I/O error");
+	    doexit(1);			/* I/O error, hangup, etc. */
+	}
 	if (debug) fprintf(db,"rpacket runt");
 	return('Q');			/* Runt */
     }
@@ -1217,7 +1221,7 @@ long amount;
     progress_display_time = now;
 
     if (progress_total < 0L)
-        fprintf(stderr, "\r%s: %ld bytes", progress_name,
+        fprintf(stderr, "\r%s: %ld/- bytes", progress_name,
                 progress_bytes);
     else
         fprintf(stderr, "\r%s: %ld/%ld bytes", progress_name,
@@ -1231,11 +1235,11 @@ VOID
 progress_finish()
 {
     if (progress_total < 0)
-        fprintf(stderr, "\r%s: %ld bytes", progress_name, progress_bytes);
+        fprintf(stderr, "\r%s: %ld/- bytes", progress_name, progress_bytes);
     else
         fprintf(stderr, "\r%s: %ld/%ld bytes", progress_name, progress_bytes, progress_total);
     fprintf(stderr, " %ld B/s", progress_bps);
-    fprintf(stderr, "\n");
+    fprintf(stderr, "\r\nComplete\r\n");
     fflush(stderr);
     progress_name[0] = NUL;
     progress_bytes = progress_last = 0L;
@@ -1244,3 +1248,30 @@ progress_finish()
     progress_total = -1L;
 }
 
+/*
+ * Report a failed file transfer.
+ */
+VOID
+progress_fail(reason)
+char *reason;
+{
+    if (!progress_name[0])
+        return;
+
+    if (progress_total < 0L)
+        fprintf(stderr, "\r%s: %ld/- bytes", progress_name, progress_bytes);
+    else
+        fprintf(stderr, "\r%s: %ld/%ld bytes",
+                progress_name, progress_bytes, progress_total);
+
+    fprintf(stderr, " %ld B/s", progress_bps);
+    fprintf(stderr, "\r\nFailed: %s\r\n",
+            (reason && *reason) ? reason : "Unknown error");
+    fflush(stderr);
+
+    progress_name[0] = NUL;
+    progress_bytes = progress_last = 0L;
+    progress_check_bytes = progress_rate_bytes = 0L;
+    progress_bps = 0L;
+    progress_total = -1L;
+}
